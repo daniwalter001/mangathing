@@ -1,4 +1,12 @@
-cfscrape
-beautifulsoup4
-lxml
-requests
+autopep8==1.6.0
+beautifulsoup4==4.10.0
+certifi==2021.10.8
+cfscrape==2.1.1
+charset-normalizer==2.0.8
+idna==3.3
+lxml==4.6.4
+pycodestyle==2.8.0
+requests==2.26.0
+soupsieve==2.3.1
+toml==0.10.2
+urllib3==1.26.7

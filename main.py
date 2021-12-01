@@ -17,7 +17,7 @@ def clear():
     os.system('cls||clear')
 
 
-def getInfos(node):
+def get_infos(node):
 
     list_manga_pic_node = node.select(
         "div.item-thumb.hover-details.c-image-hover > a")
@@ -28,9 +28,9 @@ def getInfos(node):
     return infos
 
 
-def getMorePage(start=1, end=1):
+def get_more_page(start=1, end=1):
 
-    list = []
+    list_ = []
     url = "https://mangas-origines.fr/wp-admin/admin-ajax.php"
 
     headers_c = {
@@ -78,36 +78,36 @@ def getMorePage(start=1, end=1):
         for i in range(start, end+1):
             data["page"] = str(i)
             req = cf.post(url, data, headers=headers_c)
-            print("Fetching page {}...\n ".format(str(i)))
+            print("Fetching page {}...".format(str(i)))
             time.sleep(2)
-            list.extend(getData(req))
+            list_.extend(get_data(req))
     else:
         data["page"] = str(start)
         req = cf.post(url, data, headers=headers_c)
         print("Fetching page {}...".format(str(start)))
-        list.extend(getData(req))
+        list_.extend(get_data(req))
 
-    return list
+    return list_
 
 
-def getData(req):
+def get_data(req):
     soup = bs4.BeautifulSoup(req.content, 'lxml')
     req_result = soup.select(
         "div.col-12.col-md-4.badge-pos-1 > div.page-item-detail.manga")
 
-    list = []
+    list_ = []
     for node in req_result:
-        list.append(getInfos(node))
+        list_.append(get_infos(node))
 
-    return list
+    return list_
 
 
-def getCatalogue():
+def get_catalogue():
     link = "https://mangas-origines.fr/catalogue/"
 
     catalogue_request = cf.get(link, headers=headers_g)
     print("Getting Catalogue Default Content...")
-    return getData(catalogue_request)
+    return get_data(catalogue_request)
 
 # ---------------------------------LET S GO------------------------
 
@@ -126,9 +126,9 @@ def print_menu():
 
 
 def option1():
-    list = []
-    list.extend(getCatalogue())
-    for i, el in enumerate(list):
+    list_ = []
+    list_.extend(get_catalogue())
+    for i, el in enumerate(list_):
         print("{}- {}".format(i+1, el['name']))
     print('------')
     while(True):
@@ -138,8 +138,8 @@ def option1():
             if option1 == 0:
                 clear()
                 break
-            elif option1 in range(1, len(list)+1):
-                print(list[option1-1])
+            elif option1 in range(1, len(list_)+1):
+                print(list_[option1-1])
         except:
             print('Wrong input. Please enter a number ...')
 
@@ -156,17 +156,17 @@ def option2():
     start = 1
 
     while True:
-        list = []
+        list_ = []
         try:
             print("Enter 0 to exit")
             start = int(input("Which page? : "))
             if start == 0:
                 break
 
-            list.extend(getCatalogue())
-            list.extend(getMorePage(start))
+            list_.extend(get_catalogue())
+            list_.extend(get_more_page(start))
 
-            for i, el in enumerate(list):
+            for i, el in enumerate(list_):
                 print("{}- {}".format(i+1, el['name']))
             print('------')
             while(True):
@@ -176,11 +176,11 @@ def option2():
                     if option1 == 0:
                         clear()
                         break
-                    elif option1 in range(1, len(list)+1):
-                        print(list[option1-1])
+                    elif option1 in range(1, len(list_)+1):
+                        print(list_[option1-1])
                     else:
                         print("You have {} elements displayed. You must know the range".format(
-                            str(len(list))))
+                            str(len(list_))))
                 except:
                     print('Wrong input. Please enter a number ...')
         except ValueError:
@@ -198,7 +198,7 @@ def option3():
     """)
 
     while True:
-        list = []
+        list_ = []
         try:
             print("Enter 0 to exit")
             start = int(input("Start: "))
@@ -206,10 +206,10 @@ def option3():
                 break
             end = int(input("End: "))
 
-            list.extend(getCatalogue())
-            list.extend(getMorePage(start, end))
+            list_.extend(get_catalogue())
+            list_.extend(get_more_page(start, end))
 
-            for i, el in enumerate(list):
+            for i, el in enumerate(list_):
                 print("{}- {}".format(i+1, el['name']))
             print('------')
             while(True):
@@ -219,11 +219,11 @@ def option3():
                     if option1 == 0:
                         clear()
                         break
-                    elif option1 in range(1, len(list)+1):
-                        print(list[option1-1])
+                    elif option1 in range(1, len(list_)+1):
+                        print(list_[option1-1])
                     else:
                         print("You have {} elements displayed. You must know the range".format(
-                            str(len(list))))
+                            str(len(list_))))
                 except:
                     print('Wrong input. Please enter a number ...')
         except ValueError:
