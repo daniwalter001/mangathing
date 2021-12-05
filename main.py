@@ -2,10 +2,14 @@ import bs4
 import cfscrape
 import os
 import time
+import json
 
+
+host = "mangas-origines.fr"
+# host = "x.mangas-origines.fr"
 
 headers_g = {
-    "Host": "mangas-origines.fr",
+    "Host": host,
     "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:94.0) Gecko/20100101 Firefox/94.0"
 }
 
@@ -31,17 +35,16 @@ def get_infos(node):
 def get_more_page(start=1, end=1):
 
     list_ = []
-    url = "https://mangas-origines.fr/wp-admin/admin-ajax.php"
+    url = "https://"+host+"/wp-admin/admin-ajax.php"
 
     headers_c = {
-        "Host": "mangas-origines.fr",
+        "Host": host,
         "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:94.0) Gecko/20100101 Firefox/94.0",
         "X-Requested-With": "XMLHttpRequest",
-        "Host": "mangas-origines.fr",
-        "Origin": "https://mangas-origines.fr",
-        "Referer": "https://mangas-origines.fr/catalogue/",
+        "Origin": host,
+        "Referer": "https://"+host+"/catalogue/",
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "Alt-Used": "mangas-origines.fr",
+        "Alt-Used": host,
         "Connection": "keep-alive",
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
@@ -102,12 +105,41 @@ def get_data(req):
     return list_
 
 
+def get_search_data(req):
+    soup = bs4.BeautifulSoup(req.content, 'lxml')
+    print(soup.prettify())
+    req_result = soup.select(
+        "div.c-tabs-item > div.row.c-tabs-item__content")
+
+    list_ = []
+    for node in req_result:
+        list_.append(get_infos(node))
+
+    return list_
+
+
 def get_catalogue():
-    link = "https://mangas-origines.fr/catalogue/"
+    link = "https://"+host+"/catalogue/"
 
     catalogue_request = cf.get(link, headers=headers_g)
     print("Getting Catalogue Default Content...")
     return get_data(catalogue_request)
+
+
+def search(keyword):
+    link = "https://mangas-origines.fr/wp-admin/admin-ajax.php"
+    request = cf.post(
+        link, {"action": "wp-manga-search-manga", "title": str(keyword)}, headers=headers_g)
+    res = json.loads(request.content)['data']
+
+    for item in res:
+        if item:
+            try:
+                item["error"]
+                print(item["message"])
+                break
+            except KeyError:
+                print("{} : {}".format(item['title'], item['url']))
 
 # ---------------------------------LET S GO------------------------
 
@@ -116,7 +148,8 @@ menu_options = {
     1: 'Get default Catalogue',
     2: 'Get Catalogue on a certain page',
     3: 'Get Catalogue on a certain range',
-    4: 'Exit',
+    4: 'Looking for a certain scan',
+    5: 'Exit',
 }
 
 
@@ -232,6 +265,22 @@ def option3():
             continue
 
 
+def option4():
+
+    print("U want to search? Interesting...\n")
+    while True:
+        # clear()
+        print("Enter 0 to quit")
+        keyword = str(input("Enter the keyword: "))
+        if keyword == str(0):
+            break
+        if keyword == 'clear':
+            clear()
+            continue
+        print("Results for {}...".format(keyword))
+        search(str(keyword))
+
+
 if __name__ == "__main__":
     try:
         clear()
@@ -250,6 +299,8 @@ if __name__ == "__main__":
             elif option == 3:
                 option3()
             elif option == 4:
+                option4()
+            elif option == 5:
                 print('Bye...')
                 exit()
             else:
@@ -257,3 +308,6 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print('\nProgram exited')
+
+
+# https://mangas-origines.fr/?s=&post_type=wp-manga&genre[]=adult&op=&author=&artist=&release=&adult=
