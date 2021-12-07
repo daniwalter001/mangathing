@@ -32,6 +32,16 @@ def get_infos(node):
     return infos
 
 
+def get_search_result_infos(node):
+    list_manga_pic_node = node.select(
+        "div.tab-thumb.c-image-hover > a")
+    infos = {
+        "name": list_manga_pic_node[0].attrs['title'],
+        "link": list_manga_pic_node[0].attrs["href"]
+    }
+    return infos
+
+
 def get_more_page(start=1, end=1):
 
     list_ = []
@@ -65,6 +75,7 @@ def get_more_page(start=1, end=1):
         'vars[order]': "desc",
         'vars[meta_query][0][0][key]': "manga_adult_content",
         'vars[meta_query][0][0][value]': "",
+        'vars[meta_query][0][s]': "ka",
         'vars[meta_query][0][paged]': "1",
         'vars[meta_query][0][orderby]': "meta_value_num",
         'vars[meta_query][0][template]': "archive",
@@ -79,16 +90,17 @@ def get_more_page(start=1, end=1):
 
     if start >= 0 and end and start < end:
         for i in range(start, end+1):
-            data["page"] = str(i)
+            data["page"] = str(i-1)
             req = cf.post(url, data, headers=headers_c)
             print("Fetching page {}...".format(str(i)))
             time.sleep(2)
             list_.extend(get_data(req))
     else:
-        data["page"] = str(start)
+        data["page"] = str(start-1)
         req = cf.post(url, data, headers=headers_c)
         print("Fetching page {}...".format(str(start)))
         list_.extend(get_data(req))
+        list_.extend(get_search_data(req))
 
     return list_
 
@@ -97,7 +109,6 @@ def get_data(req):
     soup = bs4.BeautifulSoup(req.content, 'lxml')
     req_result = soup.select(
         "div.col-12.col-md-4.badge-pos-1 > div.page-item-detail.manga")
-
     list_ = []
     for node in req_result:
         list_.append(get_infos(node))
@@ -107,13 +118,12 @@ def get_data(req):
 
 def get_search_data(req):
     soup = bs4.BeautifulSoup(req.content, 'lxml')
-    print(soup.prettify())
     req_result = soup.select(
-        "div.c-tabs-item > div.row.c-tabs-item__content")
+        "div.row.c-tabs-item__content")
 
     list_ = []
     for node in req_result:
-        list_.append(get_infos(node))
+        list_.append(get_search_result_infos(node))
 
     return list_
 
@@ -141,6 +151,70 @@ def search(keyword):
             except KeyError:
                 print("{} : {}".format(item['title'], item['url']))
 
+
+def deep_search(keyword=''):
+    start = 1
+    end = 1
+    list_ = []
+    url = "https://"+host+"/wp-admin/admin-ajax.php"
+
+    headers_c = {
+        "Host": host,
+        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:94.0) Gecko/20100101 Firefox/94.0",
+        "X-Requested-With": "XMLHttpRequest",
+        "Origin": host,
+        "Referer": "https://"+host+"/catalogue/",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Alt-Used": host,
+        "Connection": "keep-alive",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+    }
+
+    data_ = {
+        "action":	"madara_load_more",
+        "template":	"madara-core/content/content-search",
+        "vars[orderby]":	"",
+        "vars[paged]": "1",
+        "vars[template]":	"search",
+        "vars[meta_query][0][0][key]":	"manga_adult_content",
+        "vars[meta_query][0][0][value]":	"",
+        "vars[meta_query][0][orderby]":	"",
+        "vars[meta_query][0][paged]": "1",
+        'vars[meta_query][0][template]': "search",
+        "vars[meta_query][0][meta_query][relation]":	"AND",
+        "vars[meta_query][0][post_type]":	"wp-manga",
+        "vars[meta_query][0][post_status]": "publish",
+        "vars[meta_query][relation]":	"AND",
+        "vars[post_type]":	"wp-manga",
+        "vars[post_status]": "publish",
+        "vars[manga_archives_item_layout]":	"default",
+    }
+    i = 0
+    while True:
+        data_["page"] = str(i)
+        data_["vars[s]"] = str(keyword)
+        data_["vars[meta_query][0][s]"] = str(keyword)
+        time.sleep(2)
+        req = cf.post(url, data_, headers=headers_c)
+        print("Fetching page {}...".format(str(i+1)))
+        time.sleep(2)
+        list_temp = get_search_data(req)
+
+        if len(list_temp) != 0:
+            list_.extend(get_search_data(req))
+            i = i+1
+        else:
+            break
+
+    if len(list_) != 0:
+        for i, el in enumerate(list_):
+            print("{}- {}:{}".format(i, el["name"], el["link"]))
+    else:
+        print("Nothing to display\n")
+
+
 # ---------------------------------LET S GO------------------------
 
 
@@ -149,7 +223,8 @@ menu_options = {
     2: 'Get Catalogue on a certain page',
     3: 'Get Catalogue on a certain range',
     4: 'Looking for a certain scan',
-    5: 'Exit',
+    5: 'Looking for a certain scan - Deep Search',
+    6: 'Exit',
 }
 
 
@@ -196,7 +271,7 @@ def option2():
             if start == 0:
                 break
 
-            list_.extend(get_catalogue())
+            # list_.extend(get_catalogue())
             list_.extend(get_more_page(start))
 
             for i, el in enumerate(list_):
@@ -239,7 +314,7 @@ def option3():
                 break
             end = int(input("End: "))
 
-            list_.extend(get_catalogue())
+            # list_.extend(get_catalogue())
             list_.extend(get_more_page(start, end))
 
             for i, el in enumerate(list_):
@@ -266,19 +341,37 @@ def option3():
 
 
 def option4():
-
+    clear()
     print("U want to search? Interesting...\n")
     while True:
         # clear()
         print("Enter 0 to quit")
         keyword = str(input("Enter the keyword: "))
         if keyword == str(0):
+            clear()
             break
         if keyword == 'clear':
             clear()
             continue
         print("Results for {}...".format(keyword))
         search(str(keyword))
+
+
+def option5():
+    clear()
+    print("U want to search? Interesting...\n")
+    while True:
+        # clear()
+        print("Enter 0 to quit")
+        keyword = str(input("Enter the keyword: "))
+        if keyword == str(0):
+            clear()
+            break
+        if keyword == 'clear':
+            clear()
+            continue
+        print("Results for {}...".format(keyword))
+        print(deep_search(str(keyword)))
 
 
 if __name__ == "__main__":
@@ -301,6 +394,8 @@ if __name__ == "__main__":
             elif option == 4:
                 option4()
             elif option == 5:
+                option5()
+            elif option == 6:
                 print('Bye...')
                 exit()
             else:
