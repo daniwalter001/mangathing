@@ -1,9 +1,10 @@
 import bs4
 import cfscrape
-import os
 import time
 import json
+import os
 
+host = ''
 
 host = "mangas-origines.fr"
 # host = "x.mangas-origines.fr"
@@ -141,6 +142,7 @@ def search(keyword):
     request = cf.post(
         link, {"action": "wp-manga-search-manga", "title": str(keyword)}, headers=headers_g)
     res = json.loads(request.content)['data']
+    list_ = []
 
     for item in res:
         if item:
@@ -149,12 +151,16 @@ def search(keyword):
                 print(item["message"])
                 break
             except KeyError:
-                print("{} : {}".format(item['title'], item['url']))
+                list_.append(
+                    {
+                        "name": item['title'],
+                        "link": item['url']
+                    }
+                )
+    return list_
 
 
 def deep_search(keyword=''):
-    start = 1
-    end = 1
     list_ = []
     url = "https://"+host+"/wp-admin/admin-ajax.php"
 
@@ -204,20 +210,78 @@ def deep_search(keyword=''):
 
         if len(list_temp) != 0:
             list_.extend(get_search_data(req))
+            # print(get_search_data(req))
             i = i+1
         else:
             break
+    return list_
 
-    if len(list_) != 0:
-        for i, el in enumerate(list_):
-            print("{}- {}:{}".format(i, el["name"], el["link"]))
-    else:
-        print("Nothing to display\n")
+
+def get_chapters_data(node):
+
+    chapter_data_node = node.select("a")
+    # print(chapter_data_node)
+    a = "abc"
+    infos = {
+        "name": chapter_data_node[0].get_text().strip("\n"),
+        # "name": chapter_data_node[0].attrs['title'],
+        "link": chapter_data_node[0].attrs['href']
+    }
+
+    return infos
+
+
+def download(data):
+    pass
+
+
+def select_chapter(func):
+    def inner(data):
+        chapters = func(data)
+        if len(chapters) != 0:
+            for i, chapter in enumerate(chapters):
+                print("{}- {}".format(str(i+1).zfill(3), chapter['name']))
+            print('-----')
+            while(True):
+                option = ''
+                try:
+                    option = int(input('Enter your choice: '))
+                    if int(option) == 0:
+                        clear()
+                        break
+                    elif int(option) in range(1, len(chapters)+1):
+                        print(chapters[option-1])
+                    else:
+                        print("You have {} elements displayed. You must know the range".format(
+                            str(len(chapters))))
+                except:
+                    print('Wrong input. Please enter a number ...')
+    return inner
+
+
+@select_chapter
+def get_chapters(data):
+    list_ = []
+    try:
+        link = data["link"]
+        name = data["name"]
+
+        req = cf.post(link+"ajax/chapters/", {}, headers=headers_g)
+        soup = bs4.BeautifulSoup(req.content, 'lxml')
+        req_result = soup.select(
+            "li.wp-manga-chapter")
+        for node in req_result:
+            list_.append(get_chapters_data(node))
+
+    except KeyError:
+        print("Données invalides")
+
+    list_.reverse()
+
+    return list_
 
 
 # ---------------------------------LET S GO------------------------
-
-
 menu_options = {
     1: 'Get default Catalogue',
     2: 'Get Catalogue on a certain page',
@@ -299,10 +363,10 @@ def option2():
 
 def option3():
     print("""
-    * <<start>> and <<end>> is extrems of the range.
-    *If <<end>> is not entered, the (start)th page catalogue will be 
+    *<<Start>> and <<end>> is extrems of the range.
+    *If <<End>> is not entered, the (start)th page catalogue will be 
     displayed
-        
+
     """)
 
     while True:
@@ -354,7 +418,28 @@ def option4():
             clear()
             continue
         print("Results for {}...".format(keyword))
-        search(str(keyword))
+        search_results = search(str(keyword))
+
+        while True:
+            for i, el in enumerate(search_results):
+                print("{}- {}".format(i+1, el["name"]))
+
+            print('------')
+            option = ''
+            try:
+                print("Enter 0 to back")
+                option = int(input('Enter your choice: '))
+                if option == 0:
+                    clear()
+                    break
+                elif option in range(1, len(search_results)+1):
+                    # print(search_results[option-1])
+                    get_chapters(search_results[option-1])
+                else:
+                    print("You have {} elements displayed. You must know the range".format(
+                        str(len(search_results))))
+            except ValueError:
+                print('Wrong input. Please enter a number ...')
 
 
 def option5():
@@ -371,7 +456,28 @@ def option5():
             clear()
             continue
         print("Results for {}...".format(keyword))
-        print(deep_search(str(keyword)))
+
+        search_results = deep_search(str(keyword))
+
+        while True:
+            for i, el in enumerate(search_results):
+                print("{}- {}".format(i+1, el["name"]))
+
+            print('------')
+            option = ''
+            try:
+                print("Enter 0 to back")
+                option = int(input('Enter your choice: '))
+                if option == 0:
+                    clear()
+                    break
+                elif option in range(1, len(search_results)+1):
+                    get_chapters(search_results[option-1])
+                else:
+                    print("You have {} elements displayed. You must know the range".format(
+                        str(len(search_results))))
+            except ValueError:
+                print('Wrong input. Please enter a number ...')
 
 
 if __name__ == "__main__":
@@ -383,6 +489,7 @@ if __name__ == "__main__":
             option = ''
             try:
                 option = int(input('Enter your choice: '))
+                clear()
             except:
                 print('Wrong input. Please enter a number ...')
             if option == 1:
@@ -395,7 +502,8 @@ if __name__ == "__main__":
                 option4()
             elif option == 5:
                 option5()
-            elif option == 6:
+            elif option == 6 or option == 0:
+                print('Bye...')
                 print('Bye...')
                 exit()
             else:
@@ -403,6 +511,3 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print('\nProgram exited')
-
-
-# https://mangas-origines.fr/?s=&post_type=wp-manga&genre[]=adult&op=&author=&artist=&release=&adult=
