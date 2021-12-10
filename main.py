@@ -3,19 +3,51 @@ import cfscrape
 import time
 import json
 import os
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
+
+
+def requests_retry_session(
+    retries=3,
+    backoff_factor=0.3,
+    status_forcelist=(500, 502, 504),
+    session=None,
+):
+    session = session or requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
 
 host = ''
 
 host = "mangas-origines.fr"
 # host = "x.mangas-origines.fr"
 
+current_manga = ""
+current_chapter = ""
+home = os.getenv("HOME")
+root_dir = os.path.join(home, "Mangas")
+
+if not os.path.exists(root_dir):
+    os.mkdir(root_dir)
+
 headers_g = {
     "Host": host,
     "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:94.0) Gecko/20100101 Firefox/94.0"
 }
 
-
 cf = cfscrape.create_scraper()
+cf2 = requests_retry_session(session=cfscrape.create_scraper())
 
 
 def clear():
@@ -231,8 +263,72 @@ def get_chapters_data(node):
     return infos
 
 
+def get_pages_link(request):
+
+    soup = bs4.BeautifulSoup(request.content, "lxml")
+
+    pages_nodes = soup.select("img.wp-manga-chapter-img")
+    list_ = []
+    for el in pages_nodes:
+        page = {
+            "name": el.attrs['data-src'].split("/").pop(),
+            "link": el.attrs['data-src'].strip()
+        }
+        list_.append(page)
+    return list_
+
+
+def size_to_KB(size):
+    print(size)
+    return True
+
+
 def download(data):
-    pass
+    # print(data)
+    current_chapter = data["name"]
+    link = "{}?style=list".format(data["link"])
+    request = cf.get(link, headers=headers_g)
+    pages = get_pages_link(request)
+    current_chapter_path = os.path.join(
+        root_dir, current_manga, current_chapter)
+    if not os.path.exists(current_chapter_path):
+        os.makedirs(current_chapter_path)
+
+    count = 0
+    print(current_manga)
+    print(current_chapter)
+
+    for el in pages:
+        # print(el)
+        current_file_path = os.path.join(
+            root_dir, current_manga, current_chapter, el['name'])
+        try:
+            file = cf2.get(el["link"], headers=headers_g, timeout=5)
+            if file.status_code == 200:
+                # file.raw.decode_content = True
+                if (not os.path.exists(current_file_path)):
+                    with open(current_file_path, 'wb') as f:
+                        # shutil.copyfileobj(file.raw, f)
+                        f.write(file.content)
+                else:
+                    print("{}...".format(el['name']), end='')
+                    print("pass")
+                    continue
+
+                print("{}...".format(el['name']), end='')
+                print("ok")
+                count = count+1
+            else:
+                print("{}...".format(el['name']), end='')
+                print("failed")
+
+        except Exception as x:
+            print('It failed :(', x.__class__.__name__)
+            continue
+        # else:
+            # print('It eventually worked', file.status_code)
+
+    print("Download complete: {}/{}\n".format(count, len(pages)))
 
 
 def select_chapter(func):
@@ -245,26 +341,53 @@ def select_chapter(func):
             while(True):
                 option = ''
                 try:
-                    option = int(input('Enter your choice: '))
-                    if int(option) == 0:
+                    print("""
+* 'a b' to download a range from a to b chapters
+* 'a' to download ath chapter
+* 'all' to download all chapter
+                    """)
+                    option = input('Enter your choice: ')
+                    if str(option) == "0":
                         clear()
                         break
-                    elif int(option) in range(1, len(chapters)+1):
-                        print(chapters[option-1])
+                    elif option == "all":
+                        for el in chapters:
+                            download(el)
+                            break
                     else:
-                        print("You have {} elements displayed. You must know the range".format(
-                            str(len(chapters))))
-                except:
+                        start = 1
+                        end = 1
+
+                        try:
+                            list_option = option.split(" ")
+                            if len(list_option) != 0:
+                                start = int(list_option[0])
+                                end = int(list_option[-1])
+                                for i in range(start, end+1):
+                                    # download(chapters[i])
+                                    if int(i) in range(1, len(chapters)+1):
+                                        download(chapters[i-1])
+                                    else:
+                                        print("{}th element is not in the range".format(
+                                            str(len(chapters))))
+                                        break
+                        except Exception as e:
+                            clear()
+                            print(e)
+                            print("Follow what is written please !")
+
+                except ValueError:
                     print('Wrong input. Please enter a number ...')
     return inner
 
 
-@select_chapter
+@ select_chapter
 def get_chapters(data):
+    global current_manga
     list_ = []
     try:
         link = data["link"]
-        name = data["name"]
+        current_manga = data["name"]
 
         req = cf.post(link+"ajax/chapters/", {}, headers=headers_g)
         soup = bs4.BeautifulSoup(req.content, 'lxml')
@@ -364,7 +487,7 @@ def option2():
 def option3():
     print("""
     *<<Start>> and <<end>> is extrems of the range.
-    *If <<End>> is not entered, the (start)th page catalogue will be 
+    *If <<End>> is not entered, the (start)th page catalogue will be
     displayed
 
     """)
