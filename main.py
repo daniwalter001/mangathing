@@ -630,7 +630,7 @@ def option5():
 
 def option6():
     while True:
-        for i, el in enumerate(history):
+        for i, el in enumerate(history[:30]):
             print("{}- {}".format(i+1, el["name"]))
 
         print('------')
