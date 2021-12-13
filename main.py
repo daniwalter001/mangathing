@@ -1,3 +1,4 @@
+from posixpath import join
 import bs4
 import cfscrape
 import time
@@ -6,6 +7,7 @@ import os
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
+import pickle
 
 
 def requests_retry_session(
@@ -29,6 +31,7 @@ def requests_retry_session(
 
 
 host = ''
+history = None
 
 host = "mangas-origines.fr"
 # host = "x.mangas-origines.fr"
@@ -37,16 +40,24 @@ current_manga = ""
 current_chapter = ""
 home = os.getenv("HOME")
 root_dir = os.path.join(home, "Mangas")
+history_path = os.path.join(root_dir, "history")
 
 if not os.path.exists(root_dir):
     os.mkdir(root_dir)
+
+if os.path.exists(history_path):
+    with open(history_path, 'rb') as f:
+        history = pickle.load(f)
+else:
+    history = []
+
+print(history)
 
 headers_g = {
     "Host": host,
     "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:94.0) Gecko/20100101 Firefox/94.0"
 }
 
-cf = cfscrape.create_scraper()
 cf2 = requests_retry_session(session=cfscrape.create_scraper())
 
 
@@ -121,20 +132,22 @@ def get_more_page(start=1, end=1):
         'vars[manga_archives_item_layout]': "default"
     }
 
+    cf_ = cfscrape.create_scraper()
+
     if start >= 0 and end and start < end:
         for i in range(start, end+1):
             data["page"] = str(i-1)
-            req = cf.post(url, data, headers=headers_c)
+            req = cf_.post(url, data, headers=headers_c)
             print("Fetching page {}...".format(str(i)))
             time.sleep(2)
             list_.extend(get_data(req))
     else:
         data["page"] = str(start-1)
-        req = cf.post(url, data, headers=headers_c)
+        req = cf_.post(url, data, headers=headers_c)
         print("Fetching page {}...".format(str(start)))
         list_.extend(get_data(req))
         list_.extend(get_search_data(req))
-
+    cf_.close()
     return list_
 
 
@@ -163,15 +176,17 @@ def get_search_data(req):
 
 def get_catalogue():
     link = "https://"+host+"/catalogue/"
-
-    catalogue_request = cf.get(link, headers=headers_g)
+    cf_ = cfscrape.create_scraper()
+    catalogue_request = cf_.get(link, headers=headers_g)
     print("Getting Catalogue Default Content...")
+    cf_.close()
     return get_data(catalogue_request)
 
 
 def search(keyword):
     link = "https://mangas-origines.fr/wp-admin/admin-ajax.php"
-    request = cf.post(
+    cf_ = cfscrape.create_scraper()
+    request = cf_.post(
         link, {"action": "wp-manga-search-manga", "title": str(keyword)}, headers=headers_g)
     res = json.loads(request.content)['data']
     list_ = []
@@ -189,6 +204,7 @@ def search(keyword):
                         "link": item['url']
                     }
                 )
+    cf_.close()
     return list_
 
 
@@ -229,13 +245,16 @@ def deep_search(keyword=''):
         "vars[post_status]": "publish",
         "vars[manga_archives_item_layout]":	"default",
     }
+
     i = 0
+    cf_ = cfscrape.create_scraper()
+
     while True:
         data_["page"] = str(i)
         data_["vars[s]"] = str(keyword)
         data_["vars[meta_query][0][s]"] = str(keyword)
         time.sleep(2)
-        req = cf.post(url, data_, headers=headers_c)
+        req = cf_.post(url, data_, headers=headers_c)
         print("Fetching page {}...".format(str(i+1)))
         time.sleep(2)
         list_temp = get_search_data(req)
@@ -246,6 +265,7 @@ def deep_search(keyword=''):
             i = i+1
         else:
             break
+    cf_.close()
     return list_
 
 
@@ -266,12 +286,11 @@ def get_chapters_data(node):
 def get_pages_link(request):
 
     soup = bs4.BeautifulSoup(request.content, "lxml")
-
     pages_nodes = soup.select("img.wp-manga-chapter-img")
     list_ = []
     for el in pages_nodes:
         page = {
-            "name": el.attrs['data-src'].split("/").pop(),
+            "name": el.attrs['data-src'].split("/")[-1],
             "link": el.attrs['data-src'].strip()
         }
         list_.append(page)
@@ -284,10 +303,10 @@ def size_to_KB(size):
 
 
 def download(data):
-    # print(data)
     current_chapter = data["name"]
     link = "{}?style=list".format(data["link"])
-    request = cf.get(link, headers=headers_g)
+    cf_ = cfscrape.create_scraper()
+    request = cf_.get(link)
     pages = get_pages_link(request)
     current_chapter_path = os.path.join(
         root_dir, current_manga, current_chapter)
@@ -299,7 +318,6 @@ def download(data):
     print(current_chapter)
 
     for el in pages:
-        # print(el)
         current_file_path = os.path.join(
             root_dir, current_manga, current_chapter, el['name'])
         try:
@@ -329,11 +347,14 @@ def download(data):
             # print('It eventually worked', file.status_code)
 
     print("Download complete: {}/{}\n".format(count, len(pages)))
+    cf_.close()
+    return None
 
 
 def select_chapter(func):
     def inner(data):
         chapters = func(data)
+
         if len(chapters) != 0:
             for i, chapter in enumerate(chapters):
                 print("{}- {}".format(str(i+1).zfill(3), chapter['name']))
@@ -357,23 +378,25 @@ def select_chapter(func):
                     else:
                         start = 1
                         end = 1
-
                         try:
                             list_option = option.split(" ")
                             if len(list_option) != 0:
                                 start = int(list_option[0])
                                 end = int(list_option[-1])
                                 for i in range(start, end+1):
+                                    print("ok")
                                     # download(chapters[i])
-                                    if int(i) in range(1, len(chapters)+1):
+                                    if i in range(1, len(chapters)+1):
                                         download(chapters[i-1])
+                                        continue
                                     else:
                                         print("{}th element is not in the range".format(
                                             str(len(chapters))))
                                         break
-                        except Exception as e:
+                            else:
+                                print("Invalid entry")
+                        except ValueError:
                             clear()
-                            print(e)
                             print("Follow what is written please !")
 
                 except ValueError:
@@ -385,6 +408,8 @@ def select_chapter(func):
 def get_chapters(data):
     global current_manga
     list_ = []
+    cf = cfscrape.create_scraper()
+    history.append(data)
     try:
         link = data["link"]
         current_manga = data["name"]
@@ -407,11 +432,12 @@ def get_chapters(data):
 # ---------------------------------LET S GO------------------------
 menu_options = {
     1: 'Get default Catalogue',
-    2: 'Get Catalogue on a certain page',
-    3: 'Get Catalogue on a certain range',
+    2: 'Get Catalogue on a certain page of the catalogue',
+    3: 'Get Catalogue on a certain range of pages',
     4: 'Looking for a certain scan',
     5: 'Looking for a certain scan - Deep Search',
-    6: 'Exit',
+    6: 'History',
+    7: 'Exit',
 }
 
 
@@ -423,10 +449,10 @@ def print_menu():
 def option1():
     list_ = []
     list_.extend(get_catalogue())
-    for i, el in enumerate(list_):
-        print("{}- {}".format(i+1, el['name']))
-    print('------')
     while(True):
+        for i, el in enumerate(list_):
+            print("{}- {}".format(i+1, el['name']))
+        print('------')
         option1 = ''
         try:
             option1 = int(input('Enter your choice: '))
@@ -434,7 +460,7 @@ def option1():
                 clear()
                 break
             elif option1 in range(1, len(list_)+1):
-                print(list_[option1-1])
+                get_chapters(list_[option1-1])
         except:
             print('Wrong input. Please enter a number ...')
 
@@ -472,7 +498,7 @@ def option2():
                         clear()
                         break
                     elif option1 in range(1, len(list_)+1):
-                        print(list_[option1-1])
+                        get_chapters(list_[option1-1])
                     else:
                         print("You have {} elements displayed. You must know the range".format(
                             str(len(list_))))
@@ -515,7 +541,7 @@ def option3():
                         clear()
                         break
                     elif option1 in range(1, len(list_)+1):
-                        print(list_[option1-1])
+                        get_chapters(list_[option1-1])
                     else:
                         print("You have {} elements displayed. You must know the range".format(
                             str(len(list_))))
@@ -556,7 +582,6 @@ def option4():
                     clear()
                     break
                 elif option in range(1, len(search_results)+1):
-                    # print(search_results[option-1])
                     get_chapters(search_results[option-1])
                 else:
                     print("You have {} elements displayed. You must know the range".format(
@@ -603,6 +628,28 @@ def option5():
                 print('Wrong input. Please enter a number ...')
 
 
+def option6():
+    while True:
+        for i, el in enumerate(history):
+            print("{}- {}".format(i+1, el["name"]))
+
+        print('------')
+        option = ''
+        try:
+            print("Enter 0 to back")
+            option = int(input('Enter your choice: '))
+            if option == 0:
+                clear()
+                break
+            elif option in range(1, len(history)+1):
+                get_chapters(history[option-1])
+            else:
+                print("You have {} elements displayed. You must know the range".format(
+                    str(len(history))))
+        except ValueError:
+            print('Wrong input. Please enter a number ...')
+
+
 if __name__ == "__main__":
     try:
         clear()
@@ -625,8 +672,13 @@ if __name__ == "__main__":
                 option4()
             elif option == 5:
                 option5()
-            elif option == 6 or option == 0:
-                print('Bye...')
+            elif option == 6:
+                option6()
+            elif option == 7 or option == 0:
+                print("Saving history...", end="")
+                with open(history_path, 'wb') as f:
+                    pickle.dump(history, f)
+                print('ok')
                 print('Bye...')
                 exit()
             else:
