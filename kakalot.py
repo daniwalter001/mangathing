@@ -405,11 +405,11 @@ def option2():
             # list_.extend(get_catalogue())
             list_.extend(get_more_page(start))
 
-            for i, el in enumerate(list_):
-                print("{}- {}".format(i+1, el['name']))
-            print('------')
             while(True):
                 option1 = ''
+                for i, el in enumerate(list_):
+                    print("{}- {}".format(i+1, el['name']))
+                print('------')
                 try:
                     option1 = int(input('Enter your choice: '))
                     if option1 == 0:
@@ -547,7 +547,7 @@ def option5():
 
 def option6():
     while True:
-        for i, el in enumerate(history[:30]):
+        for i, el in enumerate(history[len(history)-31:]):
             print("{}- {}".format(i+1, el["name"]))
 
         print('------')

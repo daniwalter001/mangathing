@@ -35,8 +35,8 @@ def requests_retry_session(
 host = ''
 history = None
 
-#host = "mangas-origines.fr"
-host = "x.mangas-origines.fr"
+host = "mangas-origines.fr"
+#host = "x.mangas-origines.fr"
 
 current_manga = ""
 current_chapter = ""
@@ -488,10 +488,10 @@ def option2():
             # list_.extend(get_catalogue())
             list_.extend(get_more_page(start))
 
-            for i, el in enumerate(list_):
-                print("{}- {}".format(i+1, el['name']))
-            print('------')
             while(True):
+                for i, el in enumerate(list_):
+                    print("{}- {}".format(i+1, el['name']))
+                print('------')
                 option1 = ''
                 try:
                     option1 = int(input('Enter your choice: '))
@@ -500,6 +500,7 @@ def option2():
                         break
                     elif option1 in range(1, len(list_)+1):
                         get_chapters(list_[option1-1])
+
                     else:
                         print("You have {} elements displayed. You must know the range".format(
                             str(len(list_))))
@@ -631,7 +632,7 @@ def option5():
 
 def option6():
     while True:
-        for i, el in enumerate(history[:30]):
+        for i, el in enumerate(history[len(history)-30:]):
             print("{}- {}".format(i+1, el["name"]))
 
         print('------')

@@ -1,9 +1,10 @@
+
 from kakalot import kakalot
 from origin import origin, clear
 
 main_menu_options = {
     1: 'Origin',
-    2: 'Kakalo',
+    2: 'Kakalot',
     3: 'Exit',
 }
 
