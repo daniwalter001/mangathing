@@ -1,7 +1,6 @@
 
 
-from logging import info
-from retry import *
+from retry import requests_retry_session
 import re
 import bs4
 import cfscrape
