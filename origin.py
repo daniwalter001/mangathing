@@ -268,8 +268,10 @@ def get_pages_link(request):
     list_ = []
     for el in pages_nodes:
         page = {
-            "name": el.attrs['data-src'].split("/")[-1],
-            "link": el.attrs['data-src'].strip()
+            # "name": el.attrs['data-src'].split("/")[-1],
+            # "link": el.attrs['data-src'].strip()
+            "name": el.attrs['src'].split("/")[-1],
+            "link": el.attrs['src'].strip()
         }
         list_.append(page)
     return list_

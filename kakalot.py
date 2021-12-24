@@ -328,8 +328,7 @@ def get_chapters(data):
     history.append(data)
     try:
         link = data["link"]
-        current_manga = data["name"]
-
+        current_manga = data["name"].capitalize()
         req = cf.get(link)
         soup = bs4.BeautifulSoup(req.content, 'lxml')
         req_result = soup.select(
@@ -487,6 +486,7 @@ def option4():
 
         while True:
             for i, el in enumerate(search_results):
+                el["name"] = cleanhtml(el["name"])
                 print("{}- {}".format(i+1, cleanhtml(el["name"])))
 
             print('------')
